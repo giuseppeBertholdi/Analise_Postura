@@ -159,7 +159,9 @@ int main() {
             }
             max_rests_bound = max_danger_time + (int)bessie_path.size() + 100;
         } else {
-            max_rests_bound = 2 * bessie_cycle_len + 100;
+            // All farms on path are on farmer cycles
+            // Max rests is bounded by cycle length (once on cycle, resting closes the gap with farmers)
+            max_rests_bound = bessie_cycle_len + (int)bessie_path.size();
         }
         
         // BFS with efficient storage
