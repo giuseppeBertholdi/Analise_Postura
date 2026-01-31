@@ -112,7 +112,7 @@ int main() {
         bool has_safe_farm = (dist_to_safe[b] != -1);
         
         if (has_safe_farm) {
-            // Quick check: can reach safe farm directly?
+            // Quick check: can reach safe farm directly AND stay there?
             int safe_dist = dist_to_safe[b];
             bool can_reach_directly = true;
             int cur = b;
@@ -125,8 +125,14 @@ int main() {
             }
             
             if (can_reach_directly) {
-                cout << -2 << "\n";
-                continue;
+                // cur is now the safe farm
+                // Check if arrival time > last danger at safe farm
+                int last_danger = single_danger[cur].empty() ? -1 : single_danger[cur].back();
+                if (safe_dist > last_danger) {
+                    cout << -2 << "\n";
+                    continue;
+                }
+                // Otherwise, need BFS to navigate around dangers at safe farm
             }
         }
         
@@ -192,6 +198,20 @@ int main() {
             q.push({0, 0});
         }
         
+        // Check if Bessie can survive forever by always moving from state (m, r)
+        auto can_survive_forever = [&](int m, int r) -> bool {
+            int t = m + r;
+            // Check enough steps: until Bessie is on cycle + one full cycle
+            // Pattern repeats after one cycle, so this is sufficient
+            int steps_to_cycle = max(0, cycle_start_idx - m);
+            int check_len = steps_to_cycle + bessie_cycle_len;
+            for (int k = 1; k <= check_len; k++) {
+                int next_farm = get_pos(m + k);
+                if (is_dangerous(next_farm, t + k)) return false;
+            }
+            return true;
+        };
+        
         int max_rests = -1;
         bool found_infinite = false;
         
@@ -200,10 +220,9 @@ int main() {
             q.pop();
             
             int t = m + r;
-            max_rests = max(max_rests, r);
-            
             int cur_farm = get_pos(m);
             
+            // Check if at safe farm past all dangers
             if (has_safe_farm && !on_farmer_cycle[cur_farm]) {
                 int last_danger = single_danger[cur_farm].empty() ? -1 : single_danger[cur_farm].back();
                 if (t > last_danger) {
@@ -212,20 +231,33 @@ int main() {
                 }
             }
             
+            // Check possible next moves
+            bool can_rest = (r + 1 <= max_rests_bound && !is_dangerous(cur_farm, t + 1));
+            bool can_move = (m + 1 <= max_moves && !is_dangerous(get_pos(m + 1), t + 1));
+            
+            // For finite answer case, only count if Bessie can survive forever from this state
+            // by always moving (or has valid continuation that might lead to survival)
+            if (!has_safe_farm) {
+                // Only count rests if can survive forever by always moving
+                if (can_survive_forever(m, r)) {
+                    max_rests = max(max_rests, r);
+                }
+            } else {
+                // If has safe farm, we'll detect -2 eventually, but count rests for now
+                max_rests = max(max_rests, r);
+            }
+            
             // Try resting
-            if (r + 1 <= max_rests_bound && !is_dangerous(cur_farm, t + 1)) {
+            if (can_rest) {
                 if (mark(m, r + 1)) {
                     q.push({m, r + 1});
                 }
             }
             
             // Try moving
-            if (m + 1 <= max_moves) {
-                int next_farm = get_pos(m + 1);
-                if (!is_dangerous(next_farm, t + 1)) {
-                    if (mark(m + 1, r)) {
-                        q.push({m + 1, r});
-                    }
+            if (can_move) {
+                if (mark(m + 1, r)) {
+                    q.push({m + 1, r});
                 }
             }
         }
